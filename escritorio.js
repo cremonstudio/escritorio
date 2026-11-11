@@ -1,4 +1,4 @@
-const DADOS = {"gids": {"sinuca.parada": [[2956, 2957, 2958, 2959], [2972, 2973, 2974, 2975]], "sinuca.espalhada": [[2960, 2961, 2962, 2963], [2976, 2977, 2978, 2979]], "sinuca.pulando1": [[2964, 2965, 2966, 2967], [2980, 2981, 2982, 2983]], "sinuca.pulando2": [[2968, 2969, 2970, 2971], [2984, 2985, 2986, 2987]], "estouro": [[2988, 2989], [3004, 3005]], "pingpong": [[2990, 2991, 2992], [3006, 3007, 3008]], "bolinha.esq": [[2993]], "bolinha.dir": [[2994]], "porta.fechada": [[2995, 2996], [3011, 3012]], "porta.aberta": [[2997, 2998], [3013, 3014]], "tapete.logo": [[3020, 3021, 3022, 3023, 3024, 3025, 3026], [3036, 3037, 3038, 3039, 3040, 3041, 3042]], "mesa.mateus": [[3027, 3028, 3029], [3043, 3044, 3045]], "estante.led": [[3030, 3031], [3046, 3047]], "cadeira.mateus": [[3032]], "quadro": [[3033]], "tv.painel": [[3052, 3053, 3054], [3068, 3069, 3070]], "vapor.1": [[3055]], "vapor.2": [[3056]], "placa.prospeccao": [[3057, 3058, 3059]], "placa.previas": [[3060, 3061, 3062]], "placa.qualidade": [[3063, 3064, 3065]], "placa.design": [[3084, 3085, 3086]], "placa.reuniao": [[3087, 3088, 3089]], "placa.copa": [[3090, 3091, 3092]], "placa.mural": [[3093, 3094, 3095]], "placa.recepcao": [[3096, 3097, 3098]], "placa.lazer": [[3100, 3101, 3102]]}, "parede": 479, "colide": 3, "sinuca": {"x": 25, "y": 26}, "ping": {"x": 31, "y": 26}, "porta": {"x": 6, "y": 10}, "cafe": {"x": 29, "y": 3}};
+const DADOS = {"gids": {"vazio": [[2956]], "sinuca.parada": [[2957, 2958, 2959, 2960], [2973, 2974, 2975, 2976]], "sinuca.espalhada": [[2961, 2962, 2963, 2964], [2977, 2978, 2979, 2980]], "sinuca.pulando1": [[2965, 2966, 2967, 2968], [2981, 2982, 2983, 2984]], "sinuca.pulando2": [[2988, 2989, 2990, 2991], [3004, 3005, 3006, 3007]], "estouro": [[2992, 2993], [3008, 3009]], "pingpong": [[2994, 2995, 2996], [3010, 3011, 3012]], "bolinha.esq": [[2997]], "bolinha.dir": [[2998]], "porta.fechada": [[2999, 3000], [3015, 3016]], "porta.aberta": [[3001, 3002], [3017, 3018]], "tapete.logo": [[3020, 3021, 3022, 3023, 3024, 3025, 3026], [3036, 3037, 3038, 3039, 3040, 3041, 3042]], "mesa.mateus": [[3027, 3028, 3029], [3043, 3044, 3045]], "estante.led": [[3030, 3031], [3046, 3047]], "cadeira.mateus": [[3032]], "quadro": [[3033]], "tv.painel": [[3052, 3053, 3054], [3068, 3069, 3070]], "vapor.1": [[3055]], "vapor.2": [[3056]], "placa.prospeccao": [[3057, 3058, 3059]], "placa.previas": [[3060, 3061, 3062]], "placa.qualidade": [[3063, 3064, 3065]], "placa.design": [[3084, 3085, 3086]], "placa.reuniao": [[3087, 3088, 3089]], "placa.copa": [[3090, 3091, 3092]], "placa.mural": [[3093, 3094, 3095]], "placa.recepcao": [[3096, 3097, 3098]], "placa.lazer": [[3100, 3101, 3102]]}, "parede": 479, "colide": 3, "sinuca": {"x": 25, "y": 26}, "ping": {"x": 31, "y": 26}, "porta": {"x": 6, "y": 10}, "cafe": {"x": 29, "y": 3}};
 "use strict";
 /// <reference types="@workadventure/iframe-api-typings" />
 (() => {
@@ -116,11 +116,13 @@ const DADOS = {"gids": {"sinuca.parada": [[2956, 2957, 2958, 2959], [2972, 2973,
     // ------------------------------------------------------------ porta da sua sala
     function desenharPorta(aberta) {
         const { x, y } = DADOS.porta;
+        // Para liberar a passagem, a célula recebe um tile sem colisão: com null o WA mantém a colisão antiga.
+        const livre = DADOS.gids["vazio"][0][0];
         const tiles = [];
         for (let i = 0; i < 2; i++) {
             tiles.push({ x: x + i, y, tile: aberta ? null : DADOS.parede, layer: "porta" });
             for (let j = 0; j < 3; j++)
-                tiles.push({ x: x + i, y: y + j, tile: aberta ? null : DADOS.colide, layer: "collisions" });
+                tiles.push({ x: x + i, y: y + j, tile: aberta ? livre : DADOS.colide, layer: "collisions" });
         }
         WA.room.setTiles(tiles);
         pintar(aberta ? "porta.aberta" : "porta.fechada", "porta", x, y + 1);
