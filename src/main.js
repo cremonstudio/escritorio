@@ -90,7 +90,7 @@ const atores = ["helena", "sobrinho", "tio"].map((id) => {
 const vida = new Vida({ atores, grade, efeitos, assentos: mundo.assentos, log: (m) => console.log("[vida]", m) });
 
 // ---------------------------------------------------- rede (multiplayer)
-const rede = await conectar(urlDoServidor());
+const rede = await conectar(await urlDoServidor(), 4000);
 const online = Boolean(rede);
 const outros = new Map(); // id -> { p: Pessoa, alvo: [x, z], dir }
 const contador = document.createElement("div");

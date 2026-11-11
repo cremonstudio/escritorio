@@ -1,10 +1,25 @@
 // Conexão com o servidor do escritório (WebSocket). Sem servidor, o jogo roda sozinho (modo solo).
-export function urlDoServidor() {
+/**
+ * Onde está o servidor:
+ * - ?servidor=wss://... na URL;
+ * - servido pelo próprio servidor (Node): o mesmo endereço, em /ws;
+ * - no site (GitHub Pages): o arquivo servidor.json, que o Mac atualiza quando liga o escritório.
+ * Sem servidor no ar: null (modo solo).
+ */
+export async function urlDoServidor() {
   const param = new URLSearchParams(location.search).get("servidor");
   if (param) return param;
-  // GitHub Pages e arquivo local não têm servidor: modo solo
-  if (location.protocol === "file:" || location.hostname.endsWith("github.io") || location.hostname === "escritorio.cremonstudio.com") return null;
-  return `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
+  if (location.protocol === "file:") return null;
+  const noSite = location.hostname.endsWith("github.io") || location.hostname === "escritorio.cremonstudio.com";
+  if (!noSite) return `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
+  try {
+    const r = await fetch(`servidor.json?t=${Date.now()}`, { cache: "no-store" });
+    if (!r.ok) return null;
+    const { url } = await r.json();
+    return typeof url === "string" && url.startsWith("wss://") ? url : null;
+  } catch {
+    return null;
+  }
 }
 
 export function conectar(url, prazo = 3000) {
