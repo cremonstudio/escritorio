@@ -101,6 +101,23 @@ const DADOS = {"gids": {"bloqueio": [[2956]], "sinuca.parada": [[2957, 2958, 295
             setTimeout(() => popup.close(), 15_000);
         },
     };
+    // Balão de fala em cima da cabeça (todo mundo vê, sem depender da bolha de proximidade).
+    let balao = 0;
+    EFEITOS.fala = async (d) => {
+        const texto = String(d.texto ?? "").slice(0, 160);
+        const x = Number(d.x), y = Number(d.y);
+        if (!texto || !Number.isFinite(x) || !Number.isFinite(y))
+            return;
+        const nome = `balao-${++balao}-${Math.floor(Math.random() * 1e6)}`;
+        const url = new URL("balao.html", WA.room.mapURL);
+        url.hash = new URLSearchParams({ t: texto, n: String(d.nome ?? "") }).toString();
+        WA.room.website.create({
+            name: nome, url: url.toString(), visible: true, allowApi: false, origin: "map", scale: 1,
+            position: { x: x - 120, y: y - 118, width: 240, height: 96 },
+        });
+        await esperar(Number(d.ms) || Math.min(6_500, Math.max(2_200, texto.length * 60)));
+        await WA.room.website.delete(nome).catch(() => { });
+    };
     const vistos = new Set();
     function efeito(acao, dados = {}, espalhar = true) {
         const id = String(dados.id ?? `${WA.player.uuid}-${Date.now()}-${Math.random()}`);

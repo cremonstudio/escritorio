@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>balão</title>
+<style>
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+  .b {
+    position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%);
+    width: max-content; max-width: 220px; box-sizing: border-box;
+    background: #F6F1E8; color: #151413; border: 2px solid #151413; border-radius: 10px;
+    padding: 5px 9px 6px; font: 600 12px/1.28 Inter, -apple-system, system-ui, sans-serif;
+    box-shadow: 2px 2px 0 rgba(21, 20, 19, .28);
+    animation: entra .18s ease-out;
+  }
+  .b::after {
+    content: ""; position: absolute; left: 50%; bottom: -9px; margin-left: -7px;
+    border: 7px solid transparent; border-top-color: #151413; border-bottom: 0;
+  }
+  .n { display: block; font-size: 10px; line-height: 1.1; color: #FF5A36; margin-bottom: 1px; }
+  @keyframes entra { from { transform: translateX(-50%) scale(.6); opacity: 0; } }
+</style>
+</head>
+<body>
+<div class="b"><span class="n"></span><span class="t"></span></div>
+<script>
+  const p = new URLSearchParams(location.hash.slice(1));
+  document.querySelector(".t").textContent = p.get("t") || "";
+  document.querySelector(".n").textContent = p.get("n") || "";
+</script>
+</body>
+</html>
