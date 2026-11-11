@@ -116,15 +116,15 @@ const DADOS = {"gids": {"vazio": [[2956]], "sinuca.parada": [[2957, 2958, 2959, 
     // ------------------------------------------------------------ porta da sua sala
     function desenharPorta(aberta) {
         const { x, y } = DADOS.porta;
-        // Para liberar a passagem, a célula recebe um tile sem colisão: com null o WA mantém a colisão antiga.
-        const livre = DADOS.gids["vazio"][0][0];
         const tiles = [];
-        for (let i = 0; i < 2; i++) {
+        for (let i = 0; i < 2; i++)
             tiles.push({ x: x + i, y, tile: aberta ? null : DADOS.parede, layer: "porta" });
-            for (let j = 0; j < 3; j++)
-                tiles.push({ x: x + i, y: y + j, tile: aberta ? livre : DADOS.colide, layer: "collisions" });
-        }
         WA.room.setTiles(tiles);
+        // A passagem: a colisão da porta vive na camada "porta-colisao" (trocar tile de colisão não pega).
+        if (aberta)
+            WA.room.hideLayer("porta-colisao");
+        else
+            WA.room.showLayer("porta-colisao");
         pintar(aberta ? "porta.aberta" : "porta.fechada", "porta", x, y + 1);
     }
     async function abrirPorta(fecharEm) {
