@@ -47,6 +47,23 @@
   .entrada .ou { display: block; width: 100%; margin-top: 12px; font: 600 13px Inter, sans-serif; background: none; border: 0; color: var(--tinta); text-decoration: underline; cursor: pointer; }
   .entrada .nota { font-size: 13px; opacity: .65; margin: -6px 0 14px; }
   .entrada [hidden] { display: none !important; }
+  .chatbot { position: fixed; top: 0; right: 0; bottom: 0; width: min(380px, 100vw); z-index: 7; background: var(--creme); border-left: 2px solid var(--tinta); display: none; flex-direction: column; box-shadow: -6px 0 0 rgba(21,20,19,.08); }
+  .chatbot.on { display: flex; }
+  .chatbot header { display: flex; justify-content: space-between; align-items: center; padding: 16px 18px; border-bottom: 2px solid var(--tinta); }
+  .chatbot header b { font-size: 17px; font-weight: 800; letter-spacing: -.02em; display: block; }
+  .chatbot header small { font-size: 12px; font-weight: 600; opacity: .6; }
+  .chatbot header button { font-size: 26px; line-height: 1; background: none; border: 0; cursor: pointer; color: var(--tinta); }
+  .chatbot .aviso { margin: 12px 14px 0; padding: 10px 12px; font-size: 13px; font-weight: 600; background: #FFE7DF; border: 1.5px solid var(--laranja); border-radius: 12px; }
+  .chatbot .msgs { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .chatbot .m { max-width: 85%; padding: 9px 13px; border-radius: 16px; font-size: 14px; font-weight: 500; line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
+  .chatbot .m.bot { align-self: flex-start; background: #fff; border: 1.5px solid var(--tinta); border-bottom-left-radius: 4px; }
+  .chatbot .m.eu { align-self: flex-end; background: var(--tinta); color: var(--creme); border-bottom-right-radius: 4px; }
+  .chatbot .m.erro { align-self: center; background: #FFE7DF; color: #8a2d14; font-size: 13px; }
+  .chatbot .m.dig { opacity: .5; font-style: italic; }
+  .chatbot form { display: flex; gap: 8px; padding: 12px 14px 16px; border-top: 2px solid var(--tinta); }
+  .chatbot input { flex: 1; font: 600 14px Inter, sans-serif; padding: 11px 14px; border: 2px solid var(--tinta); border-radius: 999px; background: #FFFBF4; outline: none; }
+  .chatbot form button { font: 700 13px Inter, sans-serif; background: var(--tinta); color: var(--creme); border: 0; border-radius: 999px; padding: 0 16px; cursor: pointer; }
+  .chatbot input:disabled, .chatbot form button:disabled { opacity: .4; cursor: not-allowed; }
   .online { position: fixed; top: 76px; left: 22px; z-index: 3; font-size: 12px; font-weight: 600; opacity: .6; }
   .online.on { opacity: 1; color: var(--tinta); }
   .online.on::first-letter { color: #2ECC71; }
@@ -78,7 +95,7 @@
 </head>
 <body>
 <div class="marca">CREM<span>✱</span>N<small>escritório</small></div>
-<div class="ajuda">WASD ou clique para andar · E interage · F senta · Enter conversa · roda do mouse aproxima</div>
+<div class="ajuda">WASD ou clique para andar (toque duplo corre) · E interage · clique num funcionário para conversar · F senta · Enter conversa · roda do mouse aproxima</div>
 <div id="palco"></div>
 <div id="dica"></div>
 <script type="module" src="src/main.js"></script>

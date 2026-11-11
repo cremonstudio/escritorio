@@ -9,6 +9,7 @@ import { Vida } from "./vida.js";
 import { LUGARES, LARGURA, ALTURA } from "./planta.js";
 import { destravarSom, som } from "./som.js";
 import { conectar, urlDoServidor } from "./rede.js";
+import { criarChatBot } from "./chatbot.js";
 import { telaDeEntrada, VISUAIS } from "./entrada.js";
 
 const palco = document.getElementById("palco");
@@ -93,6 +94,7 @@ const atores = ["helena", "sobrinho", "tio"].map((id) => {
 const vida = new Vida({ atores, grade, efeitos, assentos: mundo.assentos, log: (m) => console.log("[vida]", m) });
 
 // ---------------------------------------------------- rede (multiplayer)
+const chatBot = criarChatBot({ rede, conta: escolha.conta, online });
 const outros = new Map(); // id -> { p: Pessoa, alvo: [x, z], dir }
 const contador = document.createElement("div");
 contador.className = "online";
@@ -136,6 +138,7 @@ if (!online) {
     } else {
       if (o.p.assento) levantarBot(o.p);
       o.alvo = [e.x, e.z];
+      o.p.correndo = Boolean(e.correndo);
       if (inicio) o.p.colocar(e.x, e.z, e.dir);
     }
     o.dir = e.dir;
@@ -236,7 +239,7 @@ function enviarEstado() {
   if (!online || performance.now() - ultimoEnvio < 100) return;
   const e = {
     x: +voce.pos[0].toFixed(2), z: +voce.pos[1].toFixed(2), dir: +voce.direcao.toFixed(2),
-    andando: voce.andando, assento: voce.assento ? mundo.assentos.indexOf(voce.assento) : null,
+    andando: voce.andando, correndo: voce.correndo && voce.andando, assento: voce.assento ? mundo.assentos.indexOf(voce.assento) : null,
     acao: voce.acao?.ate === Infinity ? voce.acao.nome : null,
   };
   const chave = JSON.stringify(e);
@@ -307,11 +310,19 @@ barra.addEventListener("click", (e) => {
   }
 });
 
+const TECLAS_ANDAR = new Set(["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"]);
+const soltouEm = new Map();
+const VEL_ANDAR = 3.4, VEL_CORRER = 6.6;
+
 addEventListener("keydown", (e) => {
   destravarSom();
   const k = e.key.toLowerCase();
   teclas.add(k);
   if (e.repeat) return;
+  // toque duplo numa tecla de andar = correr (enquanto segurar)
+  if (TECLAS_ANDAR.has(k)) {
+    if (performance.now() - (soltouEm.get(k) ?? -1e9) < 400) voce.correndoTeclado = true;
+  }
   if (k === "e") interagir("e");
   if (k === "q") interagir("q");
   if (k === "r") interagir("r");
@@ -321,7 +332,18 @@ addEventListener("keydown", (e) => {
     fazer(acao.acao);
   }
 });
-addEventListener("keyup", (e) => teclas.delete(e.key.toLowerCase()));
+addEventListener("keyup", (e) => {
+  const k = e.key.toLowerCase();
+  teclas.delete(k);
+  if (TECLAS_ANDAR.has(k)) {
+    soltouEm.set(k, performance.now());
+    if (![...TECLAS_ANDAR].some((t) => teclas.has(t))) voce.correndoTeclado = false;
+  }
+});
+addEventListener("blur", () => {
+  teclas.clear();
+  voce.correndoTeclado = false;
+});
 addEventListener("wheel", (e) => {
   zoom = THREE.MathUtils.clamp(zoom * (e.deltaY > 0 ? 0.9 : 1.1), 0.55, 2.4);
   enquadrar();
@@ -334,14 +356,30 @@ addEventListener("resize", () => {
 
 const raio = new THREE.Raycaster();
 const planoChao = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+let ultimoClique = 0;
 renderer.domElement.addEventListener("pointerdown", (e) => {
   destravarSom();
+  const duplo = performance.now() - ultimoClique < 380; // pointerdown não traz a contagem de cliques
+  ultimoClique = performance.now();
   const ndc = new THREE.Vector2((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
   raio.setFromCamera(ndc, camera);
+  // clicou num funcionário: abre o chat com ele
+  const clicado = atores.find((a) => raio.intersectObject(a.p.grupo, true).length);
+  if (clicado) {
+    chatBot.abrir({ id: clicado.id, nome: clicado.nome });
+    return;
+  }
   const ponto = new THREE.Vector3();
   if (!raio.ray.intersectPlane(planoChao, ponto)) return;
   const caminho = grade.caminho(voce.pos, [ponto.x, ponto.z]);
-  if (caminho) voce.seguir(caminho);
+  // duplo clique = correr até lá
+  if (caminho) {
+    voce.correndoClique = duplo;
+    const meu = (voce.idClique = (voce.idClique ?? 0) + 1);
+    voce.seguir(caminho).then(() => {
+      if (voce.idClique === meu) voce.correndoClique = false; // só o último trajeto encerra a corrida
+    });
+  }
 });
 
 // direções da tela no mundo isométrico
@@ -511,6 +549,9 @@ const relogio = new THREE.Clock();
 function quadro() {
   const dt = Math.min(0.05, relogio.getDelta());
   voce.empurrado = moverPeloTeclado(dt);
+  if (!voce.caminho.length) voce.correndoClique = false;
+  voce.correndo = Boolean(voce.correndoTeclado || voce.correndoClique);
+  voce.velocidade = voce.correndo ? VEL_CORRER : VEL_ANDAR;
   if (voce.assento && (voce.empurrado || voce.caminho.length)) voce.assento.quem = null;
   voce.atualizar(dt);
   for (const a of atores) a.p.atualizar(dt);
@@ -520,7 +561,7 @@ function quadro() {
       const d = Math.hypot(o.alvo[0] - x, o.alvo[1] - z);
       if (d > 3) o.p.colocar(o.alvo[0], o.alvo[1], o.dir);
       else if (d > 0.02) {
-        const passo = Math.min(d, 3.6 * dt);
+        const passo = Math.min(d, (o.p.correndo ? 7 : 3.8) * dt);
         o.p.grupo.position.x += ((o.alvo[0] - x) / d) * passo;
         o.p.grupo.position.z += ((o.alvo[1] - z) / d) * passo;
       }

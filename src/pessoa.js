@@ -348,12 +348,15 @@ export class Pessoa {
     // pose-alvo
     const t = this.t;
     const a = { pE: 0, pD: 0, bEx: 0, bDx: 0, bEz: 0, bDz: 0, y: 0, cX: 0, cZ: 0, rotCorpo: 0, olho: 1, boca: 1, bocaX: 1 };
-    const ciclo = t * 11;
+    const corre = this.andando && this.correndo;
+    const ciclo = t * (corre ? 17 : 11);
     if (this.andando) {
       const s = Math.sin(ciclo);
-      a.pE = s * 0.7; a.pD = -s * 0.7; a.bEx = -s * 0.6; a.bDx = s * 0.6;
-      a.y = Math.abs(Math.cos(ciclo)) * 0.06;
+      const f = corre ? 1.5 : 1;
+      a.pE = s * 0.7 * f; a.pD = -s * 0.7 * f; a.bEx = -s * 0.6 * f; a.bDx = s * 0.6 * f;
+      a.y = Math.abs(Math.cos(ciclo)) * (corre ? 0.11 : 0.06);
       a.cZ = Math.sin(ciclo) * 0.04;
+      if (corre) a.cX = 0.28; // inclina para a frente
     } else if (this.assento) {
       a.pE = a.pD = 1.45;
       a.y = 0.07;
