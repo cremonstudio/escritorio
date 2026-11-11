@@ -152,6 +152,7 @@ if (!online) {
     for (const b of m.bots) {
       const a = botPorId(b.id);
       if (!a) continue;
+      if (b.nome && b.nome !== a.nome) { a.nome = b.nome; a.p.renomear(b.nome); }
       a.p.colocar(b.pos[0], b.pos[1], b.dir);
       if (b.assento !== null) sentarBot(a.p, b.assento);
       if (b.acao) a.p.gestar(b.acao);
@@ -160,6 +161,12 @@ if (!online) {
     if (m.mundo.porta) efeitos.porta(true);
     for (const o of m.mundo.ocupados) vida.objetos.add(o);
   };
+  rede.on("nomes-bots", ({ nomes }) => {
+    for (const [id, nome] of Object.entries(nomes)) {
+      const a = botPorId(id);
+      if (a && nome && a.nome !== nome) { a.nome = nome; a.p.renomear(nome); }
+    }
+  });
   rede.on("entrou", (m) => novoOutro(m));
   rede.on("saiu", ({ id }) => {
     const o = outros.get(id);

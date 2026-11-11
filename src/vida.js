@@ -276,7 +276,7 @@ export class Vida {
     a.p.olharPara(...voce.pos);
     a.p.gestar("acenar", 900);
     const linhas = [
-      `Oi! Sou ${a.nome === "Helena" ? "a" : "o"} ${a.nome}. ${fala("respondeTarefa", a.persona, { tarefa: TAREFAS[a.id] })}`,
+      `Oi! ${a.nome} aqui. ${fala("respondeTarefa", a.persona, { tarefa: TAREFAS[a.id] })}`,
       fala("respondeTarefa", a.persona, { tarefa: TAREFAS[a.id] }),
       fala("cafeSolo", a.persona),
     ];

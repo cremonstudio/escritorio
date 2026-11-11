@@ -203,6 +203,11 @@ export class Pessoa {
     this.direcao = Math.atan2(-(x - px), -(z - pz));
   }
 
+  renomear(nome) {
+    this.nome = nome;
+    this.etiqueta.element.textContent = nome;
+  }
+
   async falar(texto, ms) {
     const dur = ms ?? Math.min(6500, Math.max(2200, texto.length * 60));
     this.balaoDiv.innerHTML = "";
@@ -482,8 +487,8 @@ export class Pessoa {
 }
 
 export const ELENCO = {
-  helena: { nome: "Helena", pele: "#F1C7A3", cabelo: "#C2502E", estilo: "rabo", camisa: "#FFFFFF", calca: "#2F3A4A" },
-  sobrinho: { nome: "Sobrinho", pele: "#D9A27A", cabelo: "#4A2E1F", estilo: "baguncado", camisa: COR.laranja, calca: "#2D4E8A", sapato: "#F4F4F0" },
+  helena: { nome: "Comercial", pele: "#F1C7A3", cabelo: "#C2502E", estilo: "rabo", camisa: "#FFFFFF", calca: "#2F3A4A" },
+  sobrinho: { nome: "Sherlock Homer", pele: "#D9A27A", cabelo: "#4A2E1F", estilo: "baguncado", camisa: COR.laranja, calca: "#2D4E8A", sapato: "#F4F4F0" },
   tio: { nome: "Tio", pele: "#EBC09C", cabelo: "#E4E4E0", estilo: "grisalho", camisa: "#4F7A45", calca: "#5A4A3C", oculos: true, bigode: true },
   voce: { nome: "Você", pele: "#E8B98F", cabelo: "#4A3426", estilo: "curto", camisa: COR.creme, calca: COR.tinta, voce: true },
 };
