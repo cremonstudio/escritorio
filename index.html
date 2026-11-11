@@ -37,6 +37,16 @@
   .barra button kbd { font: 700 10px Inter, sans-serif; background: var(--laranja); color: var(--tinta); border-radius: 5px; padding: 1px 5px; }
   .barra .reacoes button { font-size: 19px; padding: 3px 7px; }
   @media (max-width: 900px) { .barra .acoes button { font-size: 0; gap: 0; } .barra .acoes button kbd { font-size: 10px; } }
+  .nome.membro::before { content: "✱ "; color: var(--laranja); }
+  .nome.voce.membro::before { color: var(--tinta); }
+  .batida { position: fixed; top: 22px; left: 50%; transform: translateX(-50%); z-index: 6; background: var(--creme); border: 2px solid var(--tinta); border-radius: 16px; padding: 14px 18px; font-weight: 600; font-size: 14px; box-shadow: 0 4px 0 rgba(21,20,19,.2); text-align: center; }
+  .batida div { display: flex; gap: 8px; justify-content: center; margin-top: 10px; }
+  .batida button { font: 700 13px Inter, sans-serif; border: 2px solid var(--tinta); border-radius: 999px; padding: 7px 14px; cursor: pointer; background: transparent; }
+  .batida button[data-sim] { background: var(--tinta); color: var(--creme); }
+  .entrada .erro { color: #C0392B; font-size: 13px; font-weight: 600; min-height: 18px; margin: -6px 0 10px; }
+  .entrada .ou { display: block; width: 100%; margin-top: 12px; font: 600 13px Inter, sans-serif; background: none; border: 0; color: var(--tinta); text-decoration: underline; cursor: pointer; }
+  .entrada .nota { font-size: 13px; opacity: .65; margin: -6px 0 14px; }
+  .entrada [hidden] { display: none !important; }
   .online { position: fixed; top: 76px; left: 22px; z-index: 3; font-size: 12px; font-weight: 600; opacity: .6; }
   .online.on { opacity: 1; color: var(--tinta); }
   .online.on::first-letter { color: #2ECC71; }

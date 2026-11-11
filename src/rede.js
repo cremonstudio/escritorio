@@ -61,6 +61,17 @@ class Rede {
     };
     ws.onclose = () => for_each(this.ouvintes.get("caiu"), (fn) => fn());
   }
+  /** Espera a próxima mensagem de um dos tipos (ou null no prazo). */
+  proxima(tipos, prazo = 6000) {
+    return new Promise((ok) => {
+      const fim = setTimeout(() => ok(null), prazo);
+      for (const t of tipos)
+        this.on(t, (m) => {
+          clearTimeout(fim);
+          ok(m);
+        });
+    });
+  }
   on(tipo, fn) {
     if (!this.ouvintes.has(tipo)) this.ouvintes.set(tipo, []);
     this.ouvintes.get(tipo).push(fn);

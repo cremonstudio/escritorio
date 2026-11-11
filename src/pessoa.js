@@ -53,7 +53,7 @@ function cabelo(estilo, cor) {
 }
 
 export class Pessoa {
-  constructor(cena, { nome, pele = "#E8B98F", cabelo: corCabelo = "#3B2A20", estilo = "curto", camisa = COR.creme, calca = COR.tinta, sapato = COR.tinta, oculos = false, bigode = false, voce = false }) {
+  constructor(cena, { nome, pele = "#E8B98F", cabelo: corCabelo = "#3B2A20", estilo = "curto", camisa = COR.creme, calca = COR.tinta, sapato = COR.tinta, oculos = false, bigode = false, voce = false, membro: temConta = false }) {
     this.nome = nome;
     this.grupo = new THREE.Group();
     this.corpo = new THREE.Group();
@@ -155,7 +155,7 @@ export class Pessoa {
 
     // nome e fala (HTML nítido em cima da cabeça)
     const etiqueta = document.createElement("div");
-    etiqueta.className = "nome" + (voce ? " voce" : "");
+    etiqueta.className = "nome" + (voce ? " voce" : "") + (temConta ? " membro" : "");
     etiqueta.textContent = nome;
     this.etiqueta = new CSS2DObject(etiqueta);
     this.etiqueta.position.set(0, 1.62, 0);
@@ -253,9 +253,20 @@ export class Pessoa {
     if (!this.assento) return;
     const a = this.assento;
     this.assento = null;
-    // um passo para a frente da cadeira
-    this.grupo.position.x += -Math.sin(a.rot) * 0.55;
-    this.grupo.position.z += -Math.cos(a.rot) * 0.55;
+    // Sai por trás da cadeira (a frente costuma ser a mesa); se estiver bloqueado, pelos lados.
+    const livre = Pessoa.livre ?? (() => true);
+    const tras = [Math.sin(a.rot), Math.cos(a.rot)];
+    const lado = [Math.cos(a.rot), -Math.sin(a.rot)];
+    const opcoes = [
+      [tras[0] * 0.75, tras[1] * 0.75], [lado[0] * 0.8, lado[1] * 0.8], [-lado[0] * 0.8, -lado[1] * 0.8],
+      [tras[0] * 1.2, tras[1] * 1.2], [-tras[0] * 0.75, -tras[1] * 0.75],
+    ];
+    for (const [dx, dz] of opcoes)
+      if (livre(a.x + dx, a.z + dz)) {
+        this.grupo.position.x = a.x + dx;
+        this.grupo.position.z = a.z + dz;
+        return;
+      }
   }
 
   get sentado() {

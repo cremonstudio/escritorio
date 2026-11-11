@@ -74,10 +74,13 @@ cena.add(preenchimento);
 const grade = new Grade();
 const mundo = montarMundo(cena, grade);
 const efeitos = new Efeitos(cena, mundo, grade);
+Pessoa.livre = (x, z) => grade.pode(Math.floor(x), Math.floor(z));
 
 renderer.render(cena, camera); // mostra o escritório atrás da tela de entrada
-const escolha = await telaDeEntrada();
-const voce = new Pessoa(cena, { ...VISUAIS[escolha.visual], nome: escolha.nome, voce: true });
+const rede = await conectar(await urlDoServidor(), 4000);
+const online = Boolean(rede);
+const escolha = await telaDeEntrada(rede); // login, sessão salva ou visitante
+const voce = new Pessoa(cena, { ...VISUAIS[escolha.visual] ?? VISUAIS[0], nome: escolha.nome, voce: true, membro: Boolean(escolha.conta) });
 voce.colocar(...LUGARES.entrada, Math.PI);
 voce.velocidade = 3.4;
 
@@ -90,8 +93,6 @@ const atores = ["helena", "sobrinho", "tio"].map((id) => {
 const vida = new Vida({ atores, grade, efeitos, assentos: mundo.assentos, log: (m) => console.log("[vida]", m) });
 
 // ---------------------------------------------------- rede (multiplayer)
-const rede = await conectar(await urlDoServidor(), 4000);
-const online = Boolean(rede);
 const outros = new Map(); // id -> { p: Pessoa, alvo: [x, z], dir }
 const contador = document.createElement("div");
 contador.className = "online";
@@ -119,8 +120,8 @@ if (!online) {
     p.assento.quem = null;
     p.levantar();
   };
-  const novoOutro = ({ id, nome, visual, estado }) => {
-    const p = new Pessoa(cena, { ...(VISUAIS[visual] ?? VISUAIS[0]), nome });
+  const novoOutro = ({ id, nome, visual, estado, membro }) => {
+    const p = new Pessoa(cena, { ...(VISUAIS[visual] ?? VISUAIS[0]), nome, membro });
     const o = { p, alvo: null, dir: 0 };
     outros.set(id, o);
     if (estado) aplicarEstado(o, estado, true);
@@ -142,7 +143,8 @@ if (!online) {
     if (!e.acao && o.p.acao?.ate === Infinity) o.p.pararAcao();
   };
 
-  rede.on("bemvindo", (m) => {
+  const processarBemvindo = (m) => {
+    meuId = m.id;
     for (const j of m.jogadores) novoOutro(j);
     for (const b of m.bots) {
       const a = botPorId(b.id);
@@ -154,7 +156,7 @@ if (!online) {
     if (m.mundo.sinuca) efeitos.tacada(m.mundo.sinuca);
     if (m.mundo.porta) efeitos.porta(true);
     for (const o of m.mundo.ocupados) vida.objetos.add(o);
-  });
+  };
   rede.on("entrou", (m) => novoOutro(m));
   rede.on("saiu", ({ id }) => {
     const o = outros.get(id);
@@ -209,8 +211,22 @@ if (!online) {
     contador.textContent = "conexão caiu, voltando...";
     setTimeout(() => location.reload(), 3000);
   });
-  rede.on("bemvindo", (m) => (meuId = m.id));
-  rede.enviar("ola", { nome: escolha.nome, visual: escolha.visual });
+  // alguém bateu na porta da sua sala (só chega para o dono)
+  rede.on("bateram", ({ quem: nome }) => {
+    const aviso = document.createElement("div");
+    aviso.className = "batida";
+    aviso.innerHTML = `<b></b> bateu na porta da sua sala.<div><button data-sim>Deixar entrar</button><button data-nao>Agora não</button></div>`;
+    aviso.querySelector("b").textContent = nome;
+    document.body.append(aviso);
+    const fechar = () => aviso.remove();
+    aviso.querySelector("[data-sim]").onclick = () => {
+      rede.enviar("efeito", { nome: "deixarEntrar" });
+      fechar();
+    };
+    aviso.querySelector("[data-nao]").onclick = fechar;
+    setTimeout(fechar, 20_000);
+  });
+  processarBemvindo(escolha.bemvindo);
 }
 var meuId = null;
 
@@ -361,7 +377,8 @@ function oQueFazer() {
     return vida.objetos.has("sinuca") ? ["Mesa ocupada: tem jogo rolando"] : ["E", "tapa na mesa", "Q", "tacada", "R", "arrumar as bolas"];
   if (perto(PONTOS.ping, 2.4)) return vida.objetos.has("ping") ? ["Mesa ocupada: tem partida rolando"] : ["E", "sacar"];
   if (perto(PONTOS.cafe, 1.9)) return ["E", "pegar um café"];
-  if (perto(PONTOS.portaFora, 1.6) && !mundo.porta.aberta) return ["E", "bater na porta do Mateus"];
+  const dono = escolha.conta?.dono || !online;
+  if (perto(PONTOS.portaFora, 1.6) && !mundo.porta.aberta) return ["E", dono ? "abrir a porta da sua sala" : "bater na porta do Mateus"];
   if (perto(PONTOS.portaDentro, 1.6) || (perto(PONTOS.portaFora, 1.6) && mundo.porta.aberta))
     return ["E", mundo.porta.aberta ? "fechar a porta" : "abrir a porta"];
   if (perto(PONTOS.tv, 2.2)) return ["E", "abrir o painel do estúdio"];
@@ -407,6 +424,8 @@ async function interagir(tecla) {
       voce.olharPara(29, 3);
       gesto("cafe");
       online ? rede.enviar("efeito", { nome: "cafe" }) : await efeitos.cafe();
+    } else if (tecla === "e" && perto(PONTOS.portaFora, 1.6) && !mundo.porta.aberta && online && escolha.conta?.dono) {
+      rede.enviar("efeito", { nome: "porta" });
     } else if (tecla === "e" && perto(PONTOS.portaFora, 1.6) && !mundo.porta.aberta) {
       voce.falar("Toc, toc!", 1400);
       rede?.enviar("fala", { texto: "Toc, toc!" });
