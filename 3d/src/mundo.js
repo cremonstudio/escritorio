@@ -177,6 +177,9 @@ export function montarMundo(cena, grade) {
   placa("Lazer", 32.5, 22.8);
 
   const bloq = (cx, cz, w, d) => grade.bloquear(cx, cz, w, d);
+  // assentos: onde dá pra sentar (rot = para onde a pessoa olha; mesa = senta e trabalha no computador)
+  const assentos = [];
+  const assento = (x, z, rot, mesa = false) => assentos.push({ x, z, rot, mesa, quem: null });
 
   // ---------------------------------------------------- sua sala
   const tapeteSala = new THREE.Mesh(new THREE.CircleGeometry(2.1, 40), mat("#8D8A84", { roughness: 1 }));
@@ -184,10 +187,13 @@ export function montarMundo(cena, grade) {
   por(tapeteSala, 6.5, 5.2, 0, 0.006);
   por(M.mesaMateus(), 6.5, 4.6, 0); bloq(6.5, 4.6, 1.8, 0.85);
   por(M.cadeira({ cor: "#C5C8CB", encosto: "#B4B7BA", alta: true }), 6.5, 5.55, 0);
+  assento(6.5, 5.55, 0, true);
   por(M.estanteLed(), 11.2, 0.84, ROT.sul + Math.PI); bloq(11.2, 0.84, 1.6, 0.4);
   por(M.quadroAsterisco(), 13.1, 0.66, ROT.sul + Math.PI);
   por(M.poltrona("#E8DCC8"), 11.6, 4.6, ROT.oeste);
   por(M.poltrona("#E8DCC8"), 11.6, 6.6, ROT.oeste);
+  assento(11.6, 4.6, ROT.oeste);
+  assento(11.6, 6.6, ROT.oeste);
   por(M.mesaRedonda(COR.carvalho), 11.6, 5.6).scale.set(0.7, 0.62, 0.7);
   bloq(11.6, 5.6, 1, 3);
   por(M.planta(1.2, true), 1.6, 1.6); bloq(1.6, 1.6, 0.6, 0.6);
@@ -204,6 +210,8 @@ export function montarMundo(cena, grade) {
   for (const z of [4.3, 5.2, 6.1, 7.0]) {
     por(M.cadeira({ cor: COR.tinta, encosto: "#2b2a29" }), 19.9, z, ROT.leste);
     por(M.cadeira({ cor: COR.tinta, encosto: "#2b2a29" }), 22.1, z, ROT.oeste);
+    assento(19.9, z, ROT.leste);
+    assento(22.1, z, ROT.oeste);
   }
   por(M.quadroBranco(2.4), 21, 0.66, Math.PI);
   por(M.planta(1.1, true), 15.7, 1.7); bloq(15.7, 1.7, 0.6, 0.6);
@@ -229,6 +237,8 @@ export function montarMundo(cena, grade) {
       por(M.monitor(), cx + s * 0.65, cz + 0.25, Math.PI);
       por(M.cadeira(), cx + s * 0.65, cz - 1.05, Math.PI);
       por(M.cadeira(), cx + s * 0.65, cz + 1.05, 0);
+      assento(cx + s * 0.65, cz - 1.05, Math.PI, true);
+      assento(cx + s * 0.65, cz + 1.05, 0, true);
     }
     por(M.caneca(COR.laranja), cx - 1.05, cz - 0.4);
   };
@@ -240,6 +250,7 @@ export function montarMundo(cena, grade) {
   for (const x of [15.5, 17, 18.5]) {
     por(M.monitor({ largo: 0.8 }), x, 15.9, 0);
     por(M.cadeira(), x, 14.85, Math.PI);
+    assento(x, 14.85, Math.PI, true);
   }
   por(M.notebook(COR.cinzaClaro), 16.2, 15.45, Math.PI);
   for (const x of [11.5, 22.5, 33.5]) {
@@ -252,6 +263,8 @@ export function montarMundo(cena, grade) {
   por(M.tvPainel(), 0.66, 25.5, ROT.leste);
   por(M.poltrona(COR.laranja), 3.8, 24.6, ROT.oeste);
   por(M.poltrona("#E8DCC8"), 3.8, 26.4, ROT.oeste);
+  assento(3.8, 24.6, ROT.oeste);
+  assento(3.8, 26.4, ROT.oeste);
   bloq(3.8, 25.5, 0.8, 2.6);
   por(M.planta(1.2, true), 9.6, 29.4); bloq(9.6, 29.4, 0.6, 0.6);
   por(M.planta(0.9), 1.5, 29.5); bloq(1.5, 29.5, 0.5, 0.5);
@@ -263,6 +276,8 @@ export function montarMundo(cena, grade) {
   por(M.planta(1.2, true), 21.4, 22.8); bloq(21.4, 22.8, 0.6, 0.6);
   por(M.poltrona("#E8DCC8"), 20.8, 28.1, ROT.oeste);
   por(M.poltrona(COR.laranja), 20.8, 29.3, ROT.oeste);
+  assento(20.8, 28.1, ROT.oeste);
+  assento(20.8, 29.3, ROT.oeste);
   bloq(20.8, 28.7, 0.8, 2);
 
   // ---------------------------------------------------- lazer
@@ -271,8 +286,11 @@ export function montarMundo(cena, grade) {
   const ping = M.pingpong();
   por(ping.grupo, 33.5, 26.5); bloq(33.5, 26.5, 2.74, 1.52);
   por(M.sofa(2.6, "#E8DCC8"), 39.6, 22.55, Math.PI); bloq(39.6, 22.55, 2.6, 0.85);
+  assento(39.0, 22.6, Math.PI);
+  assento(40.2, 22.6, Math.PI);
   por(M.mesinha(1.1, 0.55), 39.6, 23.9); bloq(39.6, 23.9, 1.1, 0.55);
   por(M.poltrona(COR.laranja), 41.8, 24.4, ROT.oeste); bloq(41.8, 24.4, 0.8, 0.8);
+  assento(41.8, 24.4, ROT.oeste);
   por(M.arcade(), 42.1, 28.9, ROT.oeste); bloq(42.1, 28.9, 0.7, 0.75);
   por(M.planta(1.2, true), 37.2, 22.6); bloq(37.2, 22.6, 0.6, 0.6);
   por(M.planta(1.2, true), 23.6, 29.4); bloq(23.6, 29.4, 0.6, 0.6);
@@ -280,5 +298,5 @@ export function montarMundo(cena, grade) {
   tapeteLazer.rotation.x = -Math.PI / 2;
   por(tapeteLazer, 30.5, 26.5, 0, 0.005);
 
-  return { raiz, porta, sinuca, ping, maquina, interativos };
+  return { raiz, porta, sinuca, ping, maquina, interativos, assentos };
 }

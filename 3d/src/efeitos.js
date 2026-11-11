@@ -28,10 +28,12 @@ export class Efeitos {
   async tapa() {
     const { mesa, bolas, grupo } = this.m.sinuca;
     som.tapa();
+    const fora = document.createElement("div");
     const div = document.createElement("div");
     div.className = "pa";
     div.textContent = "PÁ!";
-    const pa = new CSS2DObject(div);
+    fora.append(div);
+    const pa = new CSS2DObject(fora);
     pa.position.set(0, 1.9, 0);
     grupo.add(pa);
     const base = bolas.map((b) => b.position.clone());

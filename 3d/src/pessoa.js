@@ -93,6 +93,19 @@ export class Pessoa {
       this.corpo.add(b);
       return b;
     });
+    // objetos de mão (aparecem nas ações)
+    this.caneca = new THREE.Group();
+    const corpoCaneca = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.05, 0.12, 16), mat(COR.laranja));
+    const alca = new THREE.Mesh(new THREE.TorusGeometry(0.035, 0.012, 6, 12), mat(COR.laranja));
+    alca.position.set(0.06, 0, 0);
+    this.caneca.add(corpoCaneca, alca);
+    this.caneca.position.set(0, -0.4, -0.06);
+    this.caneca.visible = false;
+    this.bracos[1].add(this.caneca);
+    this.celular = caixa(0.07, 0.15, 0.02, COR.tinta, 0.01);
+    this.celular.position.set(-0.03, -0.38, -0.05);
+    this.celular.visible = false;
+    this.bracos[1].add(this.celular);
     // cabeça
     this.cabeca = new THREE.Group();
     this.cabeca.position.y = 1.16;
@@ -100,11 +113,13 @@ export class Pessoa {
     rosto.scale.set(1, 0.95, 0.95);
     rosto.castShadow = true;
     this.cabeca.add(rosto);
+    this.olhos = [];
     for (const s of [-1, 1]) {
       const olho = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 10), mat("#1a1a1a", { roughness: 0.3 }));
       olho.scale.set(1, 1.35, 0.6);
       olho.position.set(s * 0.11, 0.02, -0.29);
       this.cabeca.add(olho);
+      this.olhos.push(olho);
       const brilho = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 6), mat("#ffffff", { emissive: "#ffffff" }));
       brilho.position.set(s * 0.11 + 0.012, 0.045, -0.315);
       this.cabeca.add(brilho);
@@ -203,15 +218,84 @@ export class Pessoa {
     if (performance.now() >= this.falando - 50) this.balao.visible = false;
   }
 
-  /** Gestos curtos: "comemorar", "tapa", "sacar", "pensar". */
-  gestar(nome, ms = 900) {
-    this.gesto = { nome, ate: performance.now() + ms, inicio: performance.now() };
+  // ------------------------------------------------------------ ações
+  /**
+   * Ações de uma vez: pular, acenar, cafe, espreguicar, bocejar, joinha, facepalm, comemorar,
+   * sacar, tapa, pensar. Ações contínuas (até mexer): dancar, celular.
+   */
+  gestar(nome, ms) {
+    const DUR = { pular: 700, acenar: 1300, cafe: 3400, espreguicar: 2200, bocejar: 1900, joinha: 1400, facepalm: 1800, comemorar: 1700, sacar: 500, tapa: 700, pensar: 1600 };
+    const continua = nome === "dancar" || nome === "celular";
+    this.acao = { nome, inicio: performance.now(), ate: continua ? Infinity : performance.now() + (ms ?? DUR[nome] ?? 1000) };
+    if (nome === "pular" && this.altura <= 0.001) this.vy = 4.4;
+    if (nome === "comemorar") {
+      if (this.altura <= 0.001) this.vy = 3.6;
+      this.confete();
+    }
+    if (nome === "cafe") this.reagir("☕");
+    if (nome === "dancar") this.reagir("♪");
+  }
+
+  pararAcao() {
+    this.acao = null;
+  }
+
+  sentar(assento) {
+    this.caminho = [];
+    this.assento = assento;
+    this.grupo.position.set(assento.x, 0, assento.z);
+    this.direcao = assento.rot;
+    this.grupo.rotation.y = assento.rot;
+    if (this.acao?.ate === Infinity && this.acao.nome !== "celular") this.acao = null;
+  }
+
+  levantar() {
+    if (!this.assento) return;
+    const a = this.assento;
+    this.assento = null;
+    // um passo para a frente da cadeira
+    this.grupo.position.x += -Math.sin(a.rot) * 0.55;
+    this.grupo.position.z += -Math.cos(a.rot) * 0.55;
+  }
+
+  get sentado() {
+    return Boolean(this.assento);
+  }
+
+  /** Emoji que sobe e some em cima da cabeça. */
+  reagir(emoji) {
+    // invólucro: o CSS2D posiciona o de fora; a animação de subir fica no de dentro
+    const fora = document.createElement("div");
+    const div = document.createElement("div");
+    div.className = "reacao";
+    div.textContent = emoji;
+    fora.append(div);
+    const o = new CSS2DObject(fora);
+    o.position.set((Math.random() - 0.5) * 0.3, 1.75, 0);
+    this.grupo.add(o);
+    setTimeout(() => this.grupo.remove(o), 1700);
+  }
+
+  confete() {
+    const cores = [COR.laranja, "#FFD23F", COR.creme, COR.tinta, "#2ECC71"];
+    const pedacos = [];
+    for (let i = 0; i < 36; i++) {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(0.05, 0.08), new THREE.MeshBasicMaterial({ color: cores[i % cores.length], side: THREE.DoubleSide }));
+      m.position.set(0, 1.6, 0);
+      m.userData.v = new THREE.Vector3((Math.random() - 0.5) * 2.4, 2 + Math.random() * 2, (Math.random() - 0.5) * 2.4);
+      m.userData.g = new THREE.Vector3(Math.random() * 8, Math.random() * 8, 0);
+      this.grupo.add(m);
+      pedacos.push(m);
+    }
+    this.confetes = (this.confetes ?? []).concat(pedacos.map((m) => ({ m, fim: performance.now() + 1600 })));
   }
 
   atualizar(dt) {
     this.t += dt;
     // movimento
     if (this.caminho.length) {
+      if (this.assento) this.levantar();
+      if (this.acao?.ate === Infinity) this.acao = null;
       const [tx, tz] = this.caminho[0];
       const [px, pz] = this.pos;
       const dx = tx - px, dz = tz - pz;
@@ -234,56 +318,151 @@ export class Pessoa {
       this.andando = true;
     } else {
       this.andando = Boolean(this.empurrado); // andando pelo teclado
+      if (this.andando && this.assento) this.levantar();
+      if (this.andando && this.acao?.ate === Infinity) this.acao = null;
     }
-    // vira suave
     let d = this.direcao - this.grupo.rotation.y;
     d = Math.atan2(Math.sin(d), Math.cos(d));
     this.grupo.rotation.y += d * Math.min(1, dt * 12);
 
-    // animação
-    const ciclo = this.t * 11;
+    // pulo (gravidade)
+    this.altura = this.altura ?? 0;
+    this.vy = this.vy ?? 0;
+    if (this.altura > 0 || this.vy > 0) {
+      this.vy -= 15 * dt;
+      this.altura = Math.max(0, this.altura + this.vy * dt);
+      if (this.altura === 0) this.vy = 0;
+    }
+
+    // pose-alvo
+    const t = this.t;
+    const a = { pE: 0, pD: 0, bEx: 0, bDx: 0, bEz: 0, bDz: 0, y: 0, cX: 0, cZ: 0, rotCorpo: 0, olho: 1, boca: 1, bocaX: 1 };
+    const ciclo = t * 11;
     if (this.andando) {
       const s = Math.sin(ciclo);
-      this.pernas[0].rotation.x = s * 0.7;
-      this.pernas[1].rotation.x = -s * 0.7;
-      this.bracos[0].rotation.x = -s * 0.6;
-      this.bracos[1].rotation.x = s * 0.6;
-      this.corpo.position.y = Math.abs(Math.cos(ciclo)) * 0.06;
-      this.cabeca.rotation.z = Math.sin(ciclo) * 0.04;
-    } else {
-      for (const p of this.pernas) p.rotation.x *= 0.8;
-      for (const b of this.bracos) b.rotation.x *= 0.85;
-      this.bracos[0].rotation.z = 0;
-      this.bracos[1].rotation.z = 0;
-      this.corpo.position.y = Math.sin(this.t * 2.2) * 0.012;
-      this.cabeca.rotation.z = Math.sin(this.t * 1.3) * 0.03;
-    }
-    // falando: cabeça mexe um pouco e boca abre
-    const falando = this.balao.visible;
-    this.boca.scale.y = falando ? 1 + Math.abs(Math.sin(this.t * 14)) * 1.4 : 1;
-    if (falando && !this.andando) this.cabeca.rotation.x = Math.sin(this.t * 5) * 0.05;
-    else this.cabeca.rotation.x *= 0.9;
-
-    // gestos
-    if (this.gesto) {
-      const agora = performance.now();
-      const k = (agora - this.gesto.inicio) / (this.gesto.ate - this.gesto.inicio);
-      if (k >= 1) this.gesto = null;
-      else if (this.gesto.nome === "comemorar") {
-        this.bracos[0].rotation.z = -2.6;
-        this.bracos[1].rotation.z = 2.6;
-        this.corpo.position.y = Math.abs(Math.sin(k * Math.PI * 4)) * 0.25;
-      } else if (this.gesto.nome === "tapa") {
-        this.bracos[1].rotation.x = k < 0.4 ? -2.6 * (k / 0.4) : -2.6 + 3.4 * Math.min(1, (k - 0.4) / 0.15);
-      } else if (this.gesto.nome === "sacar") {
-        this.bracos[1].rotation.x = -1.2 - Math.sin(k * Math.PI) * 1.2;
-      } else if (this.gesto.nome === "pensar") {
-        this.bracos[1].rotation.x = -2.0;
-        this.bracos[1].rotation.z = 0.6;
-        this.cabeca.rotation.z = 0.15;
-      } else if (this.gesto.nome === "acenar") {
-        this.bracos[1].rotation.z = 2.5 + Math.sin(k * Math.PI * 6) * 0.35;
+      a.pE = s * 0.7; a.pD = -s * 0.7; a.bEx = -s * 0.6; a.bDx = s * 0.6;
+      a.y = Math.abs(Math.cos(ciclo)) * 0.06;
+      a.cZ = Math.sin(ciclo) * 0.04;
+    } else if (this.assento) {
+      a.pE = a.pD = 1.45;
+      a.y = 0.07;
+      if (this.assento.mesa && !this.acao) {
+        // digitando
+        a.bEx = 1.15 + Math.sin(t * 17) * 0.07;
+        a.bDx = 1.15 + Math.sin(t * 17 + 2) * 0.07;
+        a.bEz = 0.18; a.bDz = -0.18;
+        a.cX = 0.12;
       }
+    } else {
+      a.y = Math.sin(t * 2.2) * 0.012;
+      a.cZ = Math.sin(t * 1.3) * 0.03;
+    }
+
+    const acao = this.acao;
+    let canecaVisivel = false, celularVisivel = false;
+    if (acao) {
+      const agora = performance.now();
+      const k = acao.ate === Infinity ? 0 : (agora - acao.inicio) / (acao.ate - acao.inicio);
+      const tt = (agora - acao.inicio) / 1000;
+      if (k >= 1) this.acao = null;
+      else
+        switch (acao.nome) {
+          case "pular":
+            a.bEz = -0.9; a.bDz = 0.9; a.pE = a.pD = this.altura > 0.05 ? -0.3 : 0;
+            break;
+          case "acenar":
+            a.bDz = 2.5 + Math.sin(k * Math.PI * 6) * 0.35; a.cZ = -0.08;
+            break;
+          case "cafe":
+            canecaVisivel = true;
+            a.bDx = k < 0.15 ? 1.1 * (k / 0.15) : k < 0.85 ? 1.1 + (Math.sin((k - 0.15) * 14) > 0.2 ? 1.2 : 0.4) : 1.1 * (1 - (k - 0.85) / 0.15);
+            a.bDz = -0.35;
+            a.cX = a.bDx > 2 ? -0.22 : 0;
+            break;
+          case "celular":
+            celularVisivel = true;
+            a.bDz = 2.4; a.bDx = 0.35; a.cZ = 0.16;
+            a.bocaX = 1;
+            a.boca = 1 + Math.abs(Math.sin(t * 9)) * (Math.sin(t * 1.3) > 0 ? 1.2 : 0);
+            break;
+          case "espreguicar":
+            a.bEz = -2.9; a.bDz = 2.9; a.cX = -0.25; a.y += Math.sin(k * Math.PI) * 0.05; a.olho = 0.25;
+            break;
+          case "bocejar":
+            a.bEx = 2.4; a.bEz = 0.55; a.boca = 1 + Math.sin(k * Math.PI) * 3.2; a.bocaX = 1 + Math.sin(k * Math.PI) * 0.8; a.olho = 0.2; a.cX = -0.15;
+            break;
+          case "joinha":
+            a.bDx = 1.5; a.bDz = -0.2; a.cZ = -0.1;
+            break;
+          case "facepalm":
+            a.bDx = 2.55; a.bDz = -0.55; a.cX = 0.32; a.olho = 0.3;
+            break;
+          case "comemorar":
+            a.bEz = -2.7; a.bDz = 2.7; a.y += Math.abs(Math.sin(k * Math.PI * 4)) * 0.06;
+            break;
+          case "dancar": {
+            const b = tt * 8.5;
+            a.y += Math.abs(Math.sin(b)) * 0.09;
+            a.rotCorpo = Math.sin(tt * 4.25) * 0.45;
+            a.bEz = -1.4 - Math.sin(b) * 0.7; a.bDz = 1.4 - Math.sin(b + Math.PI) * 0.7;
+            a.pE = Math.max(0, Math.sin(b)) * 0.5; a.pD = Math.max(0, -Math.sin(b)) * 0.5;
+            a.cZ = Math.sin(b) * 0.15;
+            if (Math.floor(tt / 1.6) !== this.ultimaNota) {
+              this.ultimaNota = Math.floor(tt / 1.6);
+              this.reagir(Math.random() < 0.5 ? "♪" : "♫");
+            }
+            break;
+          }
+          case "sacar":
+            a.bDx = 1.2 + Math.sin(k * Math.PI) * 1.2;
+            break;
+          case "tapa":
+            a.bDx = k < 0.4 ? 2.8 * (k / 0.4) : 2.8 - 1.9 * Math.min(1, (k - 0.4) / 0.15);
+            break;
+          case "pensar":
+            a.bDx = 2.2; a.bDz = -0.5; a.cZ = 0.15;
+            break;
+        }
+    }
+    this.caneca.visible = canecaVisivel;
+    this.celular.visible = celularVisivel;
+
+    // falando: boca mexe e cabeça acompanha
+    if (this.balao.visible && a.boca === 1) a.boca = 1 + Math.abs(Math.sin(t * 14)) * 1.4;
+    if (this.balao.visible && !this.andando) a.cX += Math.sin(t * 5) * 0.05;
+
+    // aplica (suave)
+    const k = Math.min(1, dt * (this.andando ? 22 : 12));
+    const ir = (atual, alvo) => atual + (alvo - atual) * k;
+    this.pernas[0].rotation.x = ir(this.pernas[0].rotation.x, a.pE);
+    this.pernas[1].rotation.x = ir(this.pernas[1].rotation.x, a.pD);
+    this.bracos[0].rotation.x = ir(this.bracos[0].rotation.x, a.bEx);
+    this.bracos[1].rotation.x = ir(this.bracos[1].rotation.x, a.bDx);
+    this.bracos[0].rotation.z = ir(this.bracos[0].rotation.z, a.bEz);
+    this.bracos[1].rotation.z = ir(this.bracos[1].rotation.z, a.bDz);
+    this.corpo.position.y = ir(this.corpo.position.y, a.y) ;
+    this.corpo.rotation.y = ir(this.corpo.rotation.y, a.rotCorpo);
+    this.cabeca.rotation.x = ir(this.cabeca.rotation.x, a.cX);
+    this.cabeca.rotation.z = ir(this.cabeca.rotation.z, a.cZ);
+    for (const o of this.olhos) o.scale.y = ir(o.scale.y, 1.35 * a.olho);
+    this.boca.scale.y = a.boca;
+    this.boca.scale.x = a.bocaX;
+    this.grupo.position.y = this.altura;
+
+    // confete
+    if (this.confetes?.length) {
+      const agora = performance.now();
+      this.confetes = this.confetes.filter(({ m, fim }) => {
+        if (agora > fim) {
+          this.grupo.remove(m);
+          return false;
+        }
+        m.userData.v.y -= 6 * dt;
+        m.position.addScaledVector(m.userData.v, dt);
+        m.rotation.x += m.userData.g.x * dt;
+        m.rotation.y += m.userData.g.y * dt;
+        return true;
+      });
     }
   }
 }

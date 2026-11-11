@@ -52,7 +52,7 @@ export const SALAS = {
 
 // Lugares onde as pessoas ficam (coordenadas do mundo, em metros)
 export const LUGARES = {
-  "mesa-helena": [4.35, 14.9], "mesa-sobrinho": [16.0, 14.85], "mesa-tio": [27.35, 14.9],
+  "mesa-helena": [4.35, 14.9], "mesa-sobrinho": [15.5, 14.85], "mesa-tio": [27.35, 14.9],
   "visita-helena": [3.3, 14.2], "visita-sobrinho": [14.9, 14.2], "visita-tio": [26.3, 14.2],
   "pingpong-esq": [31.75, 26.5], "pingpong-dir": [35.25, 26.5],
   "sinuca-a": [25.45, 26.5], "sinuca-b": [29.55, 26.5],

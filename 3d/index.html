@@ -27,6 +27,16 @@
   .placa { font-weight: 700; font-size: 13px; color: var(--creme); background: var(--tinta); padding: 6px 12px; border-radius: 8px; white-space: nowrap; box-shadow: 0 3px 0 rgba(21,20,19,.18); }
   .placa::before { content: "✱ "; color: var(--laranja); }
   .pa { font-weight: 800; font-size: 26px; color: var(--tinta); background: #FFD23F; border: 3px solid var(--laranja); padding: 10px 16px; clip-path: polygon(50% 0, 61% 18%, 82% 6%, 78% 30%, 100% 34%, 84% 52%, 100% 70%, 76% 72%, 80% 96%, 60% 84%, 50% 100%, 40% 84%, 20% 96%, 24% 72%, 0 70%, 16% 52%, 0 34%, 22% 30%, 18% 6%, 39% 18%); animation: entra .15s ease-out; }
+  #dica { bottom: 118px; }
+  .reacao { font-size: 30px; animation: sobe 1.7s ease-out forwards; filter: drop-shadow(0 2px 0 rgba(21,20,19,.25)); }
+  @keyframes sobe { 0% { transform: translateY(0) scale(.4); opacity: 0; } 15% { transform: translateY(-10px) scale(1.15); opacity: 1; } 100% { transform: translateY(-70px) scale(1); opacity: 0; } }
+  .barra { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 4; display: flex; flex-direction: column; gap: 6px; align-items: center; }
+  .barra .acoes, .barra .reacoes { display: flex; gap: 4px; background: rgba(246,241,232,.94); border: 1.5px solid var(--tinta); border-radius: 14px; padding: 5px; box-shadow: 0 3px 0 rgba(21,20,19,.15); }
+  .barra button { font: 600 12px Inter, sans-serif; color: var(--tinta); background: transparent; border: 0; border-radius: 9px; padding: 6px 8px; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 5px; }
+  .barra button:hover { background: var(--tinta); color: var(--creme); }
+  .barra button kbd { font: 700 10px Inter, sans-serif; background: var(--laranja); color: var(--tinta); border-radius: 5px; padding: 1px 5px; }
+  .barra .reacoes button { font-size: 19px; padding: 3px 7px; }
+  @media (max-width: 900px) { .barra .acoes button { font-size: 0; gap: 0; } .barra .acoes button kbd { font-size: 10px; } }
   @keyframes entra { from { transform: translateY(-4px) scale(.6); opacity: 0; } }
   @media (max-width: 640px) { .ajuda { display: none; } }
 </style>
@@ -39,7 +49,7 @@
 </head>
 <body>
 <div class="marca">CREM<span>✱</span>N<small>escritório</small></div>
-<div class="ajuda">WASD ou clique para andar · E interage · roda do mouse aproxima</div>
+<div class="ajuda">WASD ou clique para andar · E interage · F senta · roda do mouse aproxima</div>
 <div id="palco"></div>
 <div id="dica"></div>
 <script type="module" src="src/main.js"></script>

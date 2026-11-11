@@ -83,18 +83,77 @@ const atores = ["helena", "sobrinho", "tio"].map((id) => {
   p.colocar(x, z, Math.PI);
   return { id, persona: id, nome: ELENCO[id].nome, p };
 });
-const vida = new Vida({ atores, grade, efeitos, log: (m) => console.log("[vida]", m) });
+const vida = new Vida({ atores, grade, efeitos, assentos: mundo.assentos, log: (m) => console.log("[vida]", m) });
 vida.iniciar();
-setTimeout(() => vida.daily(), 1_500); // começa com a daily, pra mostrar todo mundo junto
+if (!new URLSearchParams(location.search).has("semdaily")) setTimeout(() => vida.daily(), 1_500); // começa com a daily
 
 // ---------------------------------------------------- controles
 const teclas = new Set();
+// ações do dia a dia (tecla -> ação)
+const ACOES = [
+  { tecla: " ", rotulo: "Espaço", nome: "Pular", acao: "pular" },
+  { tecla: "f", rotulo: "F", nome: "Sentar", acao: "sentar" },
+  { tecla: "1", rotulo: "1", nome: "Café", acao: "cafe" },
+  { tecla: "2", rotulo: "2", nome: "Celular", acao: "celular" },
+  { tecla: "3", rotulo: "3", nome: "Espreguiçar", acao: "espreguicar" },
+  { tecla: "4", rotulo: "4", nome: "Bocejar", acao: "bocejar" },
+  { tecla: "5", rotulo: "5", nome: "Dançar", acao: "dancar" },
+  { tecla: "6", rotulo: "6", nome: "Joinha", acao: "joinha" },
+  { tecla: "7", rotulo: "7", nome: "Facepalm", acao: "facepalm" },
+  { tecla: "8", rotulo: "8", nome: "Comemorar", acao: "comemorar" },
+  { tecla: "9", rotulo: "9", nome: "Acenar", acao: "acenar" },
+];
+const REACOES = ["👍", "❤️", "😂", "🔥", "👏", "☕", "💡", "🎉"];
+
+function fazer(acao) {
+  destravarSom();
+  if (acao === "sentar") return alternarSentar();
+  if ((acao === "dancar" || acao === "celular") && voce.acao?.nome === acao) return voce.pararAcao();
+  voce.gestar(acao);
+  if (acao === "comemorar") setTimeout(() => atores.filter((a) => vida.livre(a.id) && Math.hypot(a.p.pos[0] - voce.pos[0], a.p.pos[1] - voce.pos[1]) < 9).forEach((a) => a.p.reagir("👏")), 500);
+}
+
+function alternarSentar() {
+  if (voce.sentado) {
+    voce.assento.quem = null;
+    voce.levantar();
+    return;
+  }
+  const livre = mundo.assentos
+    .filter((a) => !a.quem)
+    .map((a) => ({ a, d: Math.hypot(a.x - voce.pos[0], a.z - voce.pos[1]) }))
+    .filter((x) => x.d < 1.6)
+    .sort((x, y) => x.d - y.d)[0];
+  if (!livre) return voce.reagir("🤷");
+  livre.a.quem = voce;
+  voce.sentar(livre.a);
+}
+
+const barra = document.createElement("div");
+barra.className = "barra";
+barra.innerHTML = `<div class="acoes">${ACOES.map((a) => `<button data-acao="${a.acao}"><kbd>${a.rotulo}</kbd>${a.nome}</button>`).join("")}</div><div class="reacoes">${REACOES.map((r) => `<button data-reacao="${r}">${r}</button>`).join("")}</div>`;
+document.body.append(barra);
+barra.addEventListener("pointerdown", (e) => e.stopPropagation());
+barra.addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.dataset.acao) fazer(b.dataset.acao);
+  if (b.dataset.reacao) voce.reagir(b.dataset.reacao);
+});
+
 addEventListener("keydown", (e) => {
   destravarSom();
-  teclas.add(e.key.toLowerCase());
-  if (e.key.toLowerCase() === "e") interagir("e");
-  if (e.key.toLowerCase() === "q") interagir("q");
-  if (e.key.toLowerCase() === "r") interagir("r");
+  const k = e.key.toLowerCase();
+  teclas.add(k);
+  if (e.repeat) return;
+  if (k === "e") interagir("e");
+  if (k === "q") interagir("q");
+  if (k === "r") interagir("r");
+  const acao = ACOES.find((a) => a.tecla === k);
+  if (acao) {
+    e.preventDefault();
+    fazer(acao.acao);
+  }
 });
 addEventListener("keyup", (e) => teclas.delete(e.key.toLowerCase()));
 addEventListener("wheel", (e) => {
@@ -157,8 +216,12 @@ function oQueFazer() {
     return ["E", mundo.porta.aberta ? "fechar a porta" : "abrir a porta"];
   if (perto(PONTOS.tv, 2.2)) return ["E", "abrir o painel do estúdio"];
   if (perto(PONTOS.arcade, 1.6)) return ["E", "jogar fliperama"];
-  const bot = atores.find((a) => perto(a.p.pos, 1.7) && vida.livre(a.id));
+  const bot = atores.find((a) => perto(a.p.pos, 1.7) && vida.livre(a.id) && !a.p.sentado);
   if (bot) return ["E", `conversar com ${bot.nome}`];
+  const botSentado = atores.find((a) => perto(a.p.pos, 1.7) && vida.livre(a.id));
+  if (botSentado) return ["E", `falar com ${botSentado.nome}`];
+  if (voce.sentado) return ["F", "levantar"];
+  if (mundo.assentos.some((a) => !a.quem && perto([a.x, a.z], 1.6))) return ["F", "sentar"];
   return null;
 }
 
@@ -224,6 +287,7 @@ const relogio = new THREE.Clock();
 function quadro() {
   const dt = Math.min(0.05, relogio.getDelta());
   voce.empurrado = moverPeloTeclado(dt);
+  if (voce.assento && (voce.empurrado || voce.caminho.length)) voce.assento.quem = null;
   voce.atualizar(dt);
   for (const a of atores) a.p.atualizar(dt);
   // porta bloqueia/desbloqueia já em efeitos; câmera segue você

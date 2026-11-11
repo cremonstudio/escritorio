@@ -14,8 +14,29 @@ const OLHAR = {
   "copa-0": [29, 3.5], "copa-1": [29, 3.5], "copa-2": [29, 4.5],
 };
 
+// Falas da rotina na mesa (zero token)
+const ROTINA = {
+  celular: {
+    helena: ["Oi! Vi sua mensagem. Posso te mandar a prévia?", "Isso, quinta às 10 fica ótimo.", "Claro! Te mando o link agora."],
+    sobrinho: ["Manda o logo em vetor que eu encaixo.", "Mãe, tô no trabalho, depois eu ligo.", "Sobe hoje, pode confiar."],
+    tio: ["Não. Item 12 falhou. Contraste.", "Reprovado. Pode mandar de novo.", "Só aprovo com os dezessete."],
+  },
+  comemorar: {
+    helena: ["Lead respondeu!", "Fechou call pra amanhã!"],
+    sobrinho: ["Prévia no ar!", "Ficou lindo, gente."],
+    tio: ["Aprovada. Dezessete de dezessete.", "Raro, mas aprovado."],
+  },
+  facepalm: {
+    helena: ["Mandei pro número errado...", "Esqueci o anexo."],
+    sobrinho: ["Quebrou no celular. De novo.", "Esqueci de trocar o telefone do rodapé."],
+    tio: ["Foto de banco de imagem. Sério?", "Texto em cima de foto sem contraste."],
+  },
+};
+const sorteio = (l) => l[Math.floor(Math.random() * l.length)];
+
 export class Vida {
-  constructor({ atores, grade, efeitos, intervalo = [9_000, 20_000], log = () => {} }) {
+  constructor({ atores, grade, efeitos, assentos = [], intervalo = [9_000, 20_000], log = () => {} }) {
+    this.assentos = assentos;
     this.atores = atores; // [{ id, persona, nome, p: Pessoa }]
     this.grade = grade;
     this.ef = efeitos;
@@ -29,7 +50,61 @@ export class Vida {
     return !this.emCena.has(id);
   }
 
+  /** O assento livre mais perto de um ponto (até 0,5 m). */
+  assentoEm([x, z]) {
+    return this.assentos
+      .filter((a) => !a.quem)
+      .map((a) => ({ a, d: Math.hypot(a.x - x, a.z - z) }))
+      .filter((o) => o.d < 0.5)
+      .sort((o, p) => o.d - p.d)[0]?.a;
+  }
+
+  sentarEm(a, lugar) {
+    const assento = this.assentoEm(LUGARES[lugar]);
+    if (!assento) return;
+    assento.quem = a.p;
+    a.p.sentar(assento);
+  }
+
+  levantar(a) {
+    if (!a.p.sentado) return;
+    a.p.assento.quem = null;
+    a.p.levantar();
+  }
+
+  /** Rotina de quem está na mesa: digita, e às vezes toma café, atende o celular, boceja... */
+  rotina() {
+    setInterval(async () => {
+      for (const a of this.atores) {
+        if (!this.livre(a.id) || !a.p.sentado || !a.p.assento.mesa || a.p.acao || Math.random() > 0.14) continue;
+        const r = Math.random() * 100;
+        if (r < 24) a.p.gestar("cafe");
+        else if (r < 40) {
+          this.emCena.add(a.id);
+          a.p.gestar("celular");
+          await this.falar(a, sorteio(ROTINA.celular[a.persona] ?? ROTINA.celular.helena));
+          await esperar(1_500);
+          a.p.pararAcao();
+          this.emCena.delete(a.id);
+        } else if (r < 54) a.p.gestar("espreguicar");
+        else if (r < 66) a.p.gestar("bocejar");
+        else if (r < 77) a.p.gestar("pensar", 2_200);
+        else if (r < 85) a.p.gestar("joinha");
+        else if (r < 93) {
+          a.p.gestar("facepalm");
+          a.p.falar(sorteio(ROTINA.facepalm[a.persona] ?? ROTINA.facepalm.helena));
+        } else {
+          a.p.gestar("comemorar");
+          a.p.falar(sorteio(ROTINA.comemorar[a.persona] ?? ROTINA.comemorar.helena));
+          setTimeout(() => this.atores.filter((o) => o !== a && this.livre(o.id)).forEach((o) => o.p.reagir("👏")), 700);
+        }
+      }
+    }, 2_500);
+  }
+
   iniciar() {
+    this.atores.forEach((a) => this.sentarEm(a, `mesa-${a.id}`));
+    this.rotina();
     (async () => {
       await esperar(3_000);
       for (;;) {
@@ -74,11 +149,13 @@ export class Vida {
   }
 
   async ir(a, lugar) {
+    this.levantar(a);
     const alvo = LUGARES[lugar];
     const pontos = this.grade.caminho(a.p.pos, alvo) ?? [];
     pontos.push(alvo);
     await a.p.seguir(pontos);
     if (OLHAR[lugar]) a.p.olharPara(...OLHAR[lugar]);
+    if (lugar.startsWith("mesa-") || lugar.startsWith("reuniao-")) this.sentarEm(a, lugar);
   }
 
   async falar(a, texto) {
