@@ -8,6 +8,8 @@ import { Efeitos } from "./efeitos.js";
 import { Vida } from "./vida.js";
 import { LUGARES, LARGURA, ALTURA } from "./planta.js";
 import { destravarSom, som } from "./som.js";
+import { conectar, urlDoServidor } from "./rede.js";
+import { telaDeEntrada, VISUAIS } from "./entrada.js";
 
 const palco = document.getElementById("palco");
 const dica = document.getElementById("dica");
@@ -73,7 +75,9 @@ const grade = new Grade();
 const mundo = montarMundo(cena, grade);
 const efeitos = new Efeitos(cena, mundo, grade);
 
-const voce = new Pessoa(cena, ELENCO.voce);
+renderer.render(cena, camera); // mostra o escritório atrás da tela de entrada
+const escolha = await telaDeEntrada();
+const voce = new Pessoa(cena, { ...VISUAIS[escolha.visual], nome: escolha.nome, voce: true });
 voce.colocar(...LUGARES.entrada, Math.PI);
 voce.velocidade = 3.4;
 
@@ -84,8 +88,147 @@ const atores = ["helena", "sobrinho", "tio"].map((id) => {
   return { id, persona: id, nome: ELENCO[id].nome, p };
 });
 const vida = new Vida({ atores, grade, efeitos, assentos: mundo.assentos, log: (m) => console.log("[vida]", m) });
-vida.iniciar();
-if (!new URLSearchParams(location.search).has("semdaily")) setTimeout(() => vida.daily(), 1_500); // começa com a daily
+
+// ---------------------------------------------------- rede (multiplayer)
+const rede = await conectar(urlDoServidor());
+const online = Boolean(rede);
+const outros = new Map(); // id -> { p: Pessoa, alvo: [x, z], dir }
+const contador = document.createElement("div");
+contador.className = "online";
+document.body.append(contador);
+function atualizarContador() {
+  contador.textContent = online ? `● ${outros.size + 1} ${outros.size ? "pessoas" : "pessoa"} no escritório` : "modo solo";
+  contador.classList.toggle("on", online);
+}
+atualizarContador();
+
+if (!online) {
+  vida.iniciar();
+  if (!new URLSearchParams(location.search).has("semdaily")) setTimeout(() => vida.daily(), 1_500);
+} else {
+  const botPorId = (id) => atores.find((a) => a.id === id);
+  const sentarBot = (p, idx) => {
+    const a = mundo.assentos[idx];
+    if (!a) return;
+    if (p.assento) p.assento.quem = null;
+    a.quem = p;
+    p.sentar(a);
+  };
+  const levantarBot = (p) => {
+    if (!p.assento) return;
+    p.assento.quem = null;
+    p.levantar();
+  };
+  const novoOutro = ({ id, nome, visual, estado }) => {
+    const p = new Pessoa(cena, { ...(VISUAIS[visual] ?? VISUAIS[0]), nome });
+    const o = { p, alvo: null, dir: 0 };
+    outros.set(id, o);
+    if (estado) aplicarEstado(o, estado, true);
+    else p.colocar(...LUGARES.entrada, Math.PI);
+    atualizarContador();
+    return o;
+  };
+  const aplicarEstado = (o, e, inicio = false) => {
+    if (e.assento !== null && e.assento !== undefined) {
+      if (o.p.assento !== mundo.assentos[e.assento]) sentarBot(o.p, e.assento);
+      o.alvo = null;
+    } else {
+      if (o.p.assento) levantarBot(o.p);
+      o.alvo = [e.x, e.z];
+      if (inicio) o.p.colocar(e.x, e.z, e.dir);
+    }
+    o.dir = e.dir;
+    if (e.acao && o.p.acao?.nome !== e.acao) o.p.gestar(e.acao);
+    if (!e.acao && o.p.acao?.ate === Infinity) o.p.pararAcao();
+  };
+
+  rede.on("bemvindo", (m) => {
+    for (const j of m.jogadores) novoOutro(j);
+    for (const b of m.bots) {
+      const a = botPorId(b.id);
+      if (!a) continue;
+      a.p.colocar(b.pos[0], b.pos[1], b.dir);
+      if (b.assento !== null) sentarBot(a.p, b.assento);
+      if (b.acao) a.p.gestar(b.acao);
+    }
+    if (m.mundo.sinuca) efeitos.tacada(m.mundo.sinuca);
+    if (m.mundo.porta) efeitos.porta(true);
+    for (const o of m.mundo.ocupados) vida.objetos.add(o);
+  });
+  rede.on("entrou", (m) => novoOutro(m));
+  rede.on("saiu", ({ id }) => {
+    const o = outros.get(id);
+    if (!o) return;
+    if (o.p.assento) o.p.assento.quem = null;
+    cena.remove(o.p.grupo);
+    o.p.grupo.traverse((x) => x.element?.remove?.());
+    outros.delete(id);
+    atualizarContador();
+  });
+  rede.on("estado", (m) => {
+    const o = outros.get(m.id);
+    if (o) aplicarEstado(o, m);
+  });
+  const quem = (id) => outros.get(id)?.p;
+  rede.on("gesto", ({ id, nome }) => quem(id)?.gestar(nome));
+  rede.on("parar", ({ id }) => quem(id)?.pararAcao());
+  rede.on("reacao", ({ id, emoji }) => quem(id)?.reagir(emoji));
+  rede.on("fala", ({ id, texto, ms }) => (id === meuId ? voce : quem(id))?.falar(texto, ms));
+  rede.on("bot", (m) => {
+    const p = botPorId(m.id)?.p;
+    if (!p) return;
+    switch (m.tipo) {
+      case "andar": {
+        levantarBot(p);
+        if (Math.hypot(p.pos[0] - m.de[0], p.pos[1] - m.de[1]) > 1.5 && !p.caminho.length) p.colocar(m.de[0], m.de[1], p.direcao);
+        const pontos = grade.caminho(p.pos, m.alvo) ?? [];
+        pontos.push(m.alvo);
+        p.seguir(pontos);
+        break;
+      }
+      case "olhar": p.olharPara(m.x, m.z); break;
+      case "fala": p.falar(m.texto, m.ms); break;
+      case "gesto": p.gestar(m.nome, m.ms); break;
+      case "parar": p.pararAcao(); break;
+      case "reacao": p.reagir(m.emoji); break;
+      case "sentar": p.caminho = []; sentarBot(p, m.idx); break;
+      case "levantar": levantarBot(p); break;
+    }
+  });
+  rede.on("efeito", (m) => {
+    if (m.nome === "rali") efeitos.rali(m.r);
+    else if (m.nome === "tacada") efeitos.tacada(m.alvos);
+    else if (m.nome === "tapa") efeitos.tapa();
+    else if (m.nome === "arrumar") efeitos.arrumar();
+    else if (m.nome === "cafe") efeitos.cafe();
+    else if (m.nome === "bater") efeitos.bater();
+  });
+  rede.on("porta", ({ aberta }) => efeitos.porta(aberta));
+  rede.on("ocupado", ({ objeto, sim }) => (sim ? vida.objetos.add(objeto) : vida.objetos.delete(objeto)));
+  rede.on("caiu", () => {
+    contador.textContent = "conexão caiu, voltando...";
+    setTimeout(() => location.reload(), 3000);
+  });
+  rede.on("bemvindo", (m) => (meuId = m.id));
+  rede.enviar("ola", { nome: escolha.nome, visual: escolha.visual });
+}
+var meuId = null;
+
+/** Manda seu estado para a sala (até 10 vezes por segundo, só quando muda). */
+let ultimoEnvio = 0, ultimoEstado = "";
+function enviarEstado() {
+  if (!online || performance.now() - ultimoEnvio < 100) return;
+  const e = {
+    x: +voce.pos[0].toFixed(2), z: +voce.pos[1].toFixed(2), dir: +voce.direcao.toFixed(2),
+    andando: voce.andando, assento: voce.assento ? mundo.assentos.indexOf(voce.assento) : null,
+    acao: voce.acao?.ate === Infinity ? voce.acao.nome : null,
+  };
+  const chave = JSON.stringify(e);
+  if (chave === ultimoEstado) return;
+  ultimoEstado = chave;
+  ultimoEnvio = performance.now();
+  rede.enviar("estado", e);
+}
 
 // ---------------------------------------------------- controles
 const teclas = new Set();
@@ -108,8 +251,12 @@ const REACOES = ["👍", "❤️", "😂", "🔥", "👏", "☕", "💡", "🎉"
 function fazer(acao) {
   destravarSom();
   if (acao === "sentar") return alternarSentar();
-  if ((acao === "dancar" || acao === "celular") && voce.acao?.nome === acao) return voce.pararAcao();
+  if ((acao === "dancar" || acao === "celular") && voce.acao?.nome === acao) {
+    rede?.enviar("parar");
+    return voce.pararAcao();
+  }
   voce.gestar(acao);
+  rede?.enviar("gesto", { nome: acao });
   if (acao === "comemorar") setTimeout(() => atores.filter((a) => vida.livre(a.id) && Math.hypot(a.p.pos[0] - voce.pos[0], a.p.pos[1] - voce.pos[1]) < 9).forEach((a) => a.p.reagir("👏")), 500);
 }
 
@@ -138,7 +285,10 @@ barra.addEventListener("click", (e) => {
   const b = e.target.closest("button");
   if (!b) return;
   if (b.dataset.acao) fazer(b.dataset.acao);
-  if (b.dataset.reacao) voce.reagir(b.dataset.reacao);
+  if (b.dataset.reacao) {
+    voce.reagir(b.dataset.reacao);
+    rede?.enviar("reacao", { emoji: b.dataset.reacao });
+  }
 });
 
 addEventListener("keydown", (e) => {
@@ -228,44 +378,99 @@ function oQueFazer() {
 async function interagir(tecla) {
   if (ocupadoVoce) return;
   ocupadoVoce = true;
+  const gesto = (nome) => {
+    voce.gestar(nome);
+    rede?.enviar("gesto", { nome });
+  };
   try {
     if (perto(PONTOS.sinuca, 2.6) && !vida.objetos.has("sinuca")) {
       voce.olharPara(...PONTOS.sinuca);
-      if (tecla === "e") { voce.gestar("tapa", 700); await new Promise((r) => setTimeout(r, 260)); await efeitos.tapa(); }
-      if (tecla === "q") { voce.gestar("sacar", 600); await efeitos.tacada(); }
-      if (tecla === "r") efeitos.arrumar();
+      if (tecla === "e") {
+        gesto("tapa");
+        await new Promise((r) => setTimeout(r, 260));
+        online ? rede.enviar("efeito", { nome: "tapa" }) : await efeitos.tapa();
+      }
+      if (tecla === "q") {
+        gesto("sacar");
+        online ? rede.enviar("efeito", { nome: "tacada" }) : await efeitos.tacada();
+      }
+      if (tecla === "r") online ? rede.enviar("efeito", { nome: "arrumar" }) : efeitos.arrumar();
     } else if (tecla === "e" && perto(PONTOS.ping, 2.4) && !vida.objetos.has("ping")) {
       voce.olharPara(...PONTOS.ping);
-      voce.gestar("sacar", 500);
-      const lado = await efeitos.rali(2 + Math.floor(Math.random() * 5));
-      await voce.falar(lado < 0 ? "Ponto da esquerda!" : "Ponto da direita!", 1800);
+      gesto("sacar");
+      if (online) rede.enviar("efeito", { nome: "rali" });
+      else {
+        const lado = await efeitos.rali();
+        await voce.falar(lado < 0 ? "Ponto da esquerda!" : "Ponto da direita!", 1800);
+      }
     } else if (tecla === "e" && perto(PONTOS.cafe, 1.9)) {
       voce.olharPara(29, 3);
-      await efeitos.cafe();
+      gesto("cafe");
+      online ? rede.enviar("efeito", { nome: "cafe" }) : await efeitos.cafe();
     } else if (tecla === "e" && perto(PONTOS.portaFora, 1.6) && !mundo.porta.aberta) {
-      efeitos.bater();
-      await voce.falar("Toc, toc!", 1400);
-      await efeitos.porta(true);
-      setTimeout(() => efeitos.porta(false), 12_000);
+      voce.falar("Toc, toc!", 1400);
+      rede?.enviar("fala", { texto: "Toc, toc!" });
+      if (online) rede.enviar("efeito", { nome: "bater" });
+      else {
+        efeitos.bater();
+        await new Promise((r) => setTimeout(r, 1200));
+        await efeitos.porta(true);
+        setTimeout(() => efeitos.porta(false), 12_000);
+      }
     } else if (tecla === "e" && (perto(PONTOS.portaDentro, 1.6) || perto(PONTOS.portaFora, 1.6))) {
-      await efeitos.porta(!mundo.porta.aberta);
+      online ? rede.enviar("efeito", { nome: "porta" }) : await efeitos.porta(!mundo.porta.aberta);
     } else if (tecla === "e" && perto(PONTOS.tv, 2.2)) {
       open("https://painel.cremonstudio.com", "_blank");
     } else if (tecla === "e" && perto(PONTOS.arcade, 1.6)) {
       som.toc();
-      voce.gestar("comemorar", 1200);
-      await voce.falar("Recorde novo!", 1800);
+      gesto("comemorar");
+      voce.falar("Recorde novo!", 1800);
+      rede?.enviar("fala", { texto: "Recorde novo!" });
     } else if (tecla === "e") {
       const bot = atores.find((a) => perto(a.p.pos, 1.7) && vida.livre(a.id));
       if (bot) {
         voce.olharPara(...bot.p.pos);
-        await vida.conversar(bot, voce);
+        if (online) rede.enviar("conversar", { bot: bot.id });
+        else await vida.conversar(bot, voce);
       }
     }
   } finally {
     ocupadoVoce = false;
   }
 }
+
+// ---------------------------------------------------- chat (Enter)
+const chat = document.createElement("form");
+chat.className = "chat";
+chat.innerHTML = `<input maxlength="160" placeholder="Fale com quem está no escritório (Enter manda, Esc fecha)">`;
+document.body.append(chat);
+const campoChat = chat.querySelector("input");
+chat.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const texto = campoChat.value.trim();
+  if (texto) {
+    voce.falar(texto);
+    rede?.enviar("fala", { texto });
+  }
+  campoChat.value = "";
+  chat.classList.remove("on");
+  campoChat.blur();
+});
+campoChat.addEventListener("keydown", (e) => {
+  e.stopPropagation();
+  if (e.key === "Escape") {
+    chat.classList.remove("on");
+    campoChat.blur();
+  }
+});
+addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && document.activeElement !== campoChat) {
+    e.preventDefault();
+    teclas.clear();
+    chat.classList.add("on");
+    campoChat.focus();
+  }
+});
 
 function atualizarDica() {
   const o = oQueFazer();
@@ -290,6 +495,22 @@ function quadro() {
   if (voce.assento && (voce.empurrado || voce.caminho.length)) voce.assento.quem = null;
   voce.atualizar(dt);
   for (const a of atores) a.p.atualizar(dt);
+  for (const o of outros.values()) {
+    if (o.alvo) {
+      const [x, z] = o.p.pos;
+      const d = Math.hypot(o.alvo[0] - x, o.alvo[1] - z);
+      if (d > 3) o.p.colocar(o.alvo[0], o.alvo[1], o.dir);
+      else if (d > 0.02) {
+        const passo = Math.min(d, 3.6 * dt);
+        o.p.grupo.position.x += ((o.alvo[0] - x) / d) * passo;
+        o.p.grupo.position.z += ((o.alvo[1] - z) / d) * passo;
+      }
+      o.p.empurrado = d > 0.05;
+    } else o.p.empurrado = false;
+    o.p.direcao = o.dir;
+    o.p.atualizar(dt);
+  }
+  enviarEstado();
   // porta bloqueia/desbloqueia já em efeitos; câmera segue você
   alvo.lerp(new THREE.Vector3(voce.pos[0], 0, voce.pos[1]), Math.min(1, dt * 4));
   camera.position.copy(alvo).addScaledVector(DIRECAO, 60);
@@ -302,4 +523,4 @@ function quadro() {
 quadro();
 
 // acesso para teste e para a ponte no futuro
-window.escritorio = { voce, atores, vida, efeitos, mundo, camera, irPara: (x, z) => voce.seguir(grade.caminho(voce.pos, [x, z]) ?? []), zoom: (z) => { zoom = z; enquadrar(); } };
+window.escritorio = { voce, atores, vida, efeitos, mundo, camera, outros, online, rede, irPara: (x, z) => voce.seguir(grade.caminho(voce.pos, [x, z]) ?? []), zoom: (z) => { zoom = z; enquadrar(); } };

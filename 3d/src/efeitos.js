@@ -2,6 +2,7 @@
 import * as THREE from "three";
 import { CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 import { som } from "./som.js";
+import { sortearTacada, sortearRali, resultadoRali } from "./sorteios.js";
 
 const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
 const anima = (ms, passo) =>
@@ -48,16 +49,11 @@ export class Efeitos {
     grupo.remove(pa);
   }
 
-  async tacada() {
+  async tacada(alvos = sortearTacada(this.m.sinuca.bolas.length)) {
     const { bolas } = this.m.sinuca;
     som.tacada();
     const de = bolas.map((b) => b.position.clone());
-    const para = bolas.map((b) => new THREE.Vector3(-1.3 + Math.random() * 2.6, b.position.y, -0.62 + Math.random() * 1.24));
-    // às vezes uma cai na caçapa
-    if (Math.random() < 0.45) {
-      const i = Math.floor(Math.random() * (bolas.length - 1));
-      para[i].set([-1.42, 0, 1.42][Math.floor(Math.random() * 3)], -0.3, Math.random() < 0.5 ? -0.72 : 0.72);
-    }
+    const para = alvos.map(([x, y, z]) => new THREE.Vector3(x, y, z));
     await anima(900, (k) => {
       const e = 1 - Math.pow(1 - k, 3);
       bolas.forEach((b, i) => b.position.lerpVectors(de[i], para[i], e));
@@ -73,19 +69,17 @@ export class Efeitos {
 
   // ------------------------------------------------ ping-pong
   /** Um rali; devolve o lado que fez o ponto (-1 esquerda, 1 direita). */
-  async rali(trocas = 3 + Math.floor(Math.random() * 6)) {
+  async rali(r = sortearRali()) {
     const bola = this.m.ping.bola;
     bola.visible = true;
-    let lado = Math.random() < 0.5 ? -1 : 1;
-    for (let i = 0; i < trocas; i++) {
+    let lado = r.lado;
+    for (const g of r.golpes) {
       const x0 = lado * 1.25, x1 = -lado * 1.25;
-      const z0 = (Math.random() - 0.5) * 1.1, z1 = (Math.random() - 0.5) * 1.1;
-      const quique = -lado * (0.35 + Math.random() * 0.5);
+      const quique = -lado * g.quique;
       som.toc();
       await anima(420, (k) => {
-        const x = x0 + (x1 - x0) * k;
-        bola.position.x = x;
-        bola.position.z = z0 + (z1 - z0) * k;
+        bola.position.x = x0 + (x1 - x0) * k;
+        bola.position.z = g.z0 + (g.z1 - g.z0) * k;
         // arco até o quique na metade do outro lado, depois sobe de novo
         const kq = (quique - x0) / (x1 - x0);
         if (k < kq) bola.position.y = 0.8 + Math.sin((k / kq) * Math.PI) * 0.32;
@@ -94,14 +88,23 @@ export class Efeitos {
       som.toc();
       lado = -lado;
     }
-    // último: bola sai da mesa
+    // último: a bola sai da mesa
     const x0 = bola.position.x;
     await anima(380, (k) => {
       bola.position.x = x0 - lado * 1.4 * k;
       bola.position.y = 0.8 + Math.sin(k * Math.PI) * 0.3 - k * 0.8;
     });
     bola.visible = false;
-    return -lado;
+    return resultadoRali(r);
+  }
+
+  /** Estado das bolas de sinuca (para quem chega no meio). */
+  posicoesSinuca() {
+    return this.m.sinuca.bolas.map((b) => b.position.toArray());
+  }
+
+  aplicarSinuca(posicoes) {
+    this.m.sinuca.bolas.forEach((b, i) => posicoes[i] && b.position.fromArray(posicoes[i]));
   }
 
   // ------------------------------------------------ café

@@ -37,6 +37,25 @@
   .barra button kbd { font: 700 10px Inter, sans-serif; background: var(--laranja); color: var(--tinta); border-radius: 5px; padding: 1px 5px; }
   .barra .reacoes button { font-size: 19px; padding: 3px 7px; }
   @media (max-width: 900px) { .barra .acoes button { font-size: 0; gap: 0; } .barra .acoes button kbd { font-size: 10px; } }
+  .online { position: fixed; top: 76px; left: 22px; z-index: 3; font-size: 12px; font-weight: 600; opacity: .6; }
+  .online.on { opacity: 1; color: var(--tinta); }
+  .online.on::first-letter { color: #2ECC71; }
+  .chat { position: fixed; left: 50%; bottom: 128px; transform: translateX(-50%); z-index: 5; display: none; }
+  .chat.on { display: block; }
+  .chat input { width: min(520px, 86vw); font: 600 14px Inter, sans-serif; color: var(--tinta); background: #FFFBF4; border: 2px solid var(--tinta); border-radius: 999px; padding: 11px 18px; outline: none; box-shadow: 0 3px 0 rgba(21,20,19,.2); }
+  .entrada { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; background: rgba(237,229,216,.72); backdrop-filter: blur(6px); }
+  .entrada .cartao { width: min(380px, 88vw); background: var(--creme); border: 2px solid var(--tinta); border-radius: 22px; padding: 26px 26px 22px; box-shadow: 0 6px 0 rgba(21,20,19,.2); }
+  .entrada .logo { font-weight: 800; font-size: 22px; letter-spacing: -0.045em; }
+  .entrada .logo span { color: var(--laranja); }
+  .entrada h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; margin: 14px 0 16px; }
+  .entrada label, .entrada .rotulo { display: block; font-size: 12px; font-weight: 700; margin-bottom: 6px; }
+  .entrada input { display: block; width: 100%; box-sizing: border-box; margin-top: 6px; margin-bottom: 16px; font: 600 15px Inter, sans-serif; border: 2px solid var(--tinta); border-radius: 12px; padding: 10px 12px; background: #FFFBF4; outline: none; }
+  .entrada .visuais { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-bottom: 18px; }
+  .entrada .visuais button { aspect-ratio: 1; border-radius: 14px; border: 2px solid transparent; background: #EDE5D8; cursor: pointer; display: grid; place-items: center; padding: 0; }
+  .entrada .visuais button.sel { border-color: var(--tinta); background: #fff; }
+  .entrada .visuais i { width: 26px; height: 34px; border-radius: 13px 13px 6px 6px; background: linear-gradient(var(--cabelo) 0 28%, var(--pele) 28% 55%, var(--camisa) 55%); }
+  .entrada .entrar { width: 100%; font: 700 15px Inter, sans-serif; color: var(--creme); background: var(--tinta); border: 0; border-radius: 999px; padding: 13px; cursor: pointer; }
+  .entrada .entrar:hover { background: var(--laranja); color: var(--tinta); }
   @keyframes entra { from { transform: translateY(-4px) scale(.6); opacity: 0; } }
   @media (max-width: 640px) { .ajuda { display: none; } }
 </style>
@@ -49,7 +68,7 @@
 </head>
 <body>
 <div class="marca">CREM<span>✱</span>N<small>escritório</small></div>
-<div class="ajuda">WASD ou clique para andar · E interage · F senta · roda do mouse aproxima</div>
+<div class="ajuda">WASD ou clique para andar · E interage · F senta · Enter conversa · roda do mouse aproxima</div>
 <div id="palco"></div>
 <div id="dica"></div>
 <script type="module" src="src/main.js"></script>
